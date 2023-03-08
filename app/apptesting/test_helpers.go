@@ -258,28 +258,29 @@ func CopyConnectionAndClientToPath(path *ibctesting.Path, pathToCopy *ibctesting
 }
 
 // Constructs an ICA Packet Acknowledgement compatible with ibc-go v5+
-func ICAPacketAcknowledgement(t *testing.T, msgType string, msgResponses []proto.Message) channeltypes.Acknowledgement {
-	txMsgData := &sdk.TxMsgData{
-		MsgResponses: make([]*codectypes.Any, len(msgResponses)),
-	}
-	for i, msgResponse := range msgResponses {
-		var value []byte
-		var err error
-		if msgResponse != nil {
-			value, err = proto.Marshal(msgResponse)
-			require.NoError(t, err, "marshal error")
-		}
-
-		txMsgData.MsgResponses[i] = &codectypes.Any{
-			TypeUrl: msgType,
-			Value:   value,
-		}
-	}
-	marshalledTxMsgData, err := proto.Marshal(txMsgData)
-	require.NoError(t, err)
-	ack := channeltypes.NewResultAcknowledgement(marshalledTxMsgData)
-	return ack
-}
+//  
+// func ICAPacketAcknowledgement(t *testing.T, msgType string, msgResponses []proto.Message) channeltypes.Acknowledgement {
+//	txMsgData := &sdk.TxMsgData{
+//		MsgResponses: make([]*codectypes.Any, len(msgResponses)),
+//	}
+//	for i, msgResponse := range msgResponses {
+//		var value []byte
+//		var err error
+//		if msgResponse != nil {
+//			value, err = proto.Marshal(msgResponse)
+//			require.NoError(t, err, "marshal error")
+//		}
+//
+//		txMsgData.MsgResponses[i] = &codectypes.Any{
+//			TypeUrl: msgType,
+//			Value:   value,
+//		}
+//	}
+//	marshalledTxMsgData, err := proto.Marshal(txMsgData)
+//	drequire.NoError(t, err)
+//	ack := channeltypes.NewResultAcknowledgement(marshalledTxMsgData)
+//	return ack
+//}
 
 // Constructs an legacy ICA Packet Acknowledgement compatible with ibc-go version v4 and lower
 func ICAPacketAcknowledgementLegacy(t *testing.T, msgType string, msgResponses []proto.Message) channeltypes.Acknowledgement {

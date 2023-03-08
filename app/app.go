@@ -123,11 +123,18 @@ import (
 	terpmodulekeeper "github.com/terpnetwork/terp-core/x/terp/keeper"
 	terpmoduletypes "github.com/terpnetwork/terp-core/x/terp/types"
 
-	
 	// Epoch Module
 	epochsmodule "github.com/terpnetwork/terp-core/x/epochs"
 	epochsmodulekeeper "github.com/terpnetwork/terp-core/x/epochs/keeper"
 	epochsmoduletypes "github.com/terpnetwork/terp-core/x/epochs/types"
+
+	// Claim Module
+	claimvesting "github.com/terpnetwork/terp-core/x/claim/vesting"
+	claimvestingtypes "github.com/terpnetwork/terp-core/x/claim/vesting/types"
+
+	"github.com/terpnetwork/terp-core/x/claim"
+	claimkeeper "github.com/terpnetwork/terp-core/x/claim/keeper"
+	claimtypes "github.com/terpnetwork/terp-core/x/claim/types"
 
 
 
@@ -225,6 +232,7 @@ var (
 		evidence.AppModuleBasic{},
 		transfer.AppModuleBasic{},
 		vesting.AppModuleBasic{},
+		claimvesting.AppModuleBasic{},
 		wasm.AppModuleBasic{},
 		terpmodule.AppModuleBasic{},
 		ica.AppModuleBasic{},
@@ -244,6 +252,7 @@ var (
 		ibcfeetypes.ModuleName:         nil,
 		icatypes.ModuleName:            nil,
 		wasm.ModuleName:                {authtypes.Burner},
+		claimtypes.ModuleName:           nil,
 	}
 )
 
@@ -290,6 +299,8 @@ type TerpApp struct {
 	WasmKeeper          wasm.Keeper
 	TerpKeeper          terpmodulekeeper.Keeper
 	EpochsKeeper             epochsmodulekeeper.Keeper
+	ClaimKeeper              claimkeeper.Keeper
+
 
 
 	ScopedIBCKeeper           capabilitykeeper.ScopedKeeper
@@ -337,7 +348,7 @@ func NewTerpApp(
 		minttypes.StoreKey, distrtypes.StoreKey, slashingtypes.StoreKey,
 		govtypes.StoreKey, paramstypes.StoreKey, ibchost.StoreKey, upgradetypes.StoreKey,
 		evidencetypes.StoreKey, ibctransfertypes.StoreKey, capabilitytypes.StoreKey, terpmoduletypes.StoreKey,
-		epochsmoduletypes.StoreKey, feegrant.StoreKey, authzkeeper.StoreKey, wasm.StoreKey, icahosttypes.StoreKey,
+		epochsmoduletypes.StoreKey, claimtypes.StoreKey,feegrant.StoreKey, authzkeeper.StoreKey, wasm.StoreKey, icahosttypes.StoreKey,
 		icacontrollertypes.StoreKey, intertxtypes.StoreKey, ibcfeetypes.StoreKey,
 	)
 	tkeys := sdk.NewTransientStoreKeys(paramstypes.TStoreKey)
@@ -452,7 +463,7 @@ func NewTerpApp(
 	// register the staking hooks
 	// NOTE: stakingKeeper above is passed by reference, so that it will contain these hooks
 	app.StakingKeeper = *stakingKeeper.SetHooks(
-		stakingtypes.NewMultiStakingHooks(app.DistrKeeper.Hooks(), app.SlashingKeeper.Hooks()),
+		stakingtypes.NewMultiStakingHooks(app.DistrKeeper.Hooks(), app.SlashingKeeper.Hooks(), app.ClaimKeeper.Hooks()),
 	)
 
 	app.IBCKeeper = ibckeeper.NewKeeper(
@@ -545,9 +556,18 @@ func NewTerpApp(
 
 	app.EpochsKeeper = *epochsKeeper.SetHooks(
 		epochsmoduletypes.NewMultiEpochHooks(
+			app.ClaimKeeper.Hooks(),
+			app.MintKeeper.Hooks(),
+
 		),
 	)
 	epochsModule := epochsmodule.NewAppModule(appCodec, app.EpochsKeeper)
+	
+	app.ClaimKeeper = *claimkeeper.NewKeeper(
+		appCodec,
+		keys[claimtypes.StoreKey],
+		app.AccountKeeper,
+		app.BankKeeper, app.StakingKeeper, app.DistrKeeper, epochsKeeper)
 
 	// The last arguments can contain custom message handlers, and custom query handlers,
 	// if we want to allow any custom callbacks
@@ -640,6 +660,7 @@ func NewTerpApp(
 		),
 		auth.NewAppModule(appCodec, app.AccountKeeper, nil),
 		vesting.NewAppModule(app.AccountKeeper, app.BankKeeper),
+		claimvesting.NewAppModule(app.AccountKeeper, app.BankKeeper),
 		bank.NewAppModule(appCodec, app.BankKeeper, app.AccountKeeper),
 		capability.NewAppModule(appCodec, *app.CapabilityKeeper),
 		gov.NewAppModule(appCodec, app.GovKeeper, app.AccountKeeper, app.BankKeeper),
@@ -660,6 +681,7 @@ func NewTerpApp(
 		intertx.NewAppModule(appCodec, app.InterTxKeeper),
 		terpModule,
 		epochsModule,
+		claim.NewAppModule(appCodec, app.ClaimKeeper),
 		crisis.NewAppModule(&app.CrisisKeeper, skipGenesisInvariants), // always be last to make sure that it checks for all invariants and not only part of them
 	)
 
@@ -684,6 +706,7 @@ func NewTerpApp(
 		feegrant.ModuleName,
 		paramstypes.ModuleName,
 		vestingtypes.ModuleName,
+		claimvestingtypes.ModuleName,
 		// additional non simd modules
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
@@ -693,6 +716,7 @@ func NewTerpApp(
 		wasm.ModuleName,
 		terpmoduletypes.ModuleName,
 		epochsmoduletypes.ModuleName,
+		claimtypes.ModuleName,
 
 	)
 
@@ -713,6 +737,7 @@ func NewTerpApp(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
+		claimvestingtypes.ModuleName,
 		// additional non simd modules
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
@@ -722,6 +747,7 @@ func NewTerpApp(
 		wasm.ModuleName,
 		terpmoduletypes.ModuleName,
 		epochsmoduletypes.ModuleName,
+		claimtypes.ModuleName,
 
 	)
 
@@ -749,6 +775,7 @@ func NewTerpApp(
 		paramstypes.ModuleName,
 		upgradetypes.ModuleName,
 		vestingtypes.ModuleName,
+		claimvestingtypes,
 		// additional non simd modules
 		ibctransfertypes.ModuleName,
 		ibchost.ModuleName,
@@ -759,6 +786,7 @@ func NewTerpApp(
 		wasm.ModuleName,
 		terpmoduletypes.ModuleName,
 		epochsmoduletypes.ModuleName,
+		claimtypes.ModuleName,
 
 	)
 
@@ -1014,6 +1042,7 @@ func initParamsKeeper(appCodec codec.BinaryCodec, legacyAmino *codec.LegacyAmino
 	paramsKeeper.Subspace(ibchost.ModuleName)
 	paramsKeeper.Subspace(terpmoduletypes.ModuleName)
 	paramsKeeper.Subspace(epochsmoduletypes.ModuleName)
+	paramsKeeper.Subspace(claimtypes.ModuleName)
 	paramsKeeper.Subspace(icahosttypes.SubModuleName)
 	paramsKeeper.Subspace(icacontrollertypes.SubModuleName)
 	paramsKeeper.Subspace(wasm.ModuleName)
